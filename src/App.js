@@ -29,10 +29,20 @@ const GrowthDashboard = () => {
     weeklyRank: { rank: '', days: 0, insight: '', calibration: '' }
   };
 
-  const updateToday = (path, value) => {
+ const updateToday = (path, value) => {
     const newData = { ...data };
     if (!newData[currentDate]) {
-      newData[currentDate] = JSON.parse(JSON.stringify(today));
+      newData[currentDate] = {
+        physique: { workout: false, eating: false, hydration: false },
+        skill: { minutes: 0, focus: 'AI', output: '' },
+        mind: { done: false, reflection: '' },
+        sideQuests: { communication: false, leadership: false, entrepreneur: false, wealth: false, reading: false },
+        resistance: { junkFood: false, scrolling: false, mood: false, dopamine: false },
+        close: { well: '', adjust: '', gratitude: '' },
+        weeklyRank: { rank: '', days: 0, insight: '', calibration: '' },
+        logged: true,
+        timestamp: new Date().toISOString()
+      };
     }
 
     const keys = path.split('.');
@@ -41,6 +51,7 @@ const GrowthDashboard = () => {
       current = current[keys[i]];
     }
     current[keys[keys.length - 1]] = value;
+    newData[currentDate].timestamp = new Date().toISOString();
 
     setData(newData);
   };
@@ -103,9 +114,17 @@ const GrowthDashboard = () => {
         skillMinutesTotal += day.skill.minutes;
       }
     });
+    // AUTOMATIC RANK CALCULATION
+    const weeklyRank = clearedDays === 7 ? { rank: 'S', color: 'text-cyan-400', title: 'PERFECT' } :
+                          clearedDays >= 6 ? { rank: 'A', color: 'text-green-400', title: 'ELITE' } :
+                          clearedDays >= 5 ? { rank: 'B', color: 'text-blue-400', title: 'CONSISTENT' } :
+                          clearedDays >= 3 ? { rank: 'C', color: 'text-yellow-400', title: 'AVERAGE' } :
+                          clearedDays >= 1 ? { rank: 'D', color: 'text-orange-400', title: 'SURVIVAL' } :
+                          { rank: 'E', color: 'text-red-600', title: 'FAILURE' };
 
     return {
       totalDays,
+      weeklyRank,
       clearedDays,
       clearRate,
       avgSideQuests: totalDays > 0 ? (sideQuestTotal / totalDays).toFixed(1) : 0,
@@ -113,6 +132,15 @@ const GrowthDashboard = () => {
       totalSkillHours: Math.round(skillMinutesTotal / 60),
       currentStreak: calculateStreak()
     };
+  };
+  // AUTOMATIC RANK CALCULATION
+  const calculateWeeklyRank = (clearedDays) => {
+    if (clearedDays === 7) return { rank: 'S', color: 'text-cyan-400', title: 'PERFECT' };
+    if (clearedDays >= 6) return { rank: 'A', color: 'text-green-400', title: 'ELITE' };
+    if (clearedDays >= 5) return { rank: 'B', color: 'text-blue-400', title: 'CONSISTENT' };
+    if (clearedDays >= 3) return { rank: 'C', color: 'text-yellow-400', title: 'AVERAGE' };
+    if (clearedDays >= 1) return { rank: 'D', color: 'text-orange-400', title: 'SURVIVAL' };
+    return { rank: 'E', color: 'text-red-600', title: 'FAILURE' };
   };
 
   const generateAIAnalysis = async () => {
@@ -324,107 +352,86 @@ Keep it real, grounded, and supportive but firm. No generic advice. Use the actu
     );
   }
 
-  // Weekly View
+// Weekly View (UPDATED)
   if (view === 'weekly') {
     const getWeekDates = () => {
       const curr = new Date(currentDate);
-      const week = [];
-      const first = curr.getDate() - curr.getDay();
+      const day = curr.getDay() || 7; // Get current day (Monday=1...Sunday=7)
+      if (day !== 1) curr.setHours(-24 * (day - 1)); // Adjust to Monday
 
+      const week = [];
       for (let i = 0; i < 7; i++) {
-        const date = new Date(curr.setDate(first + i));
-        week.push(date.toISOString().split('T')[0]);
+        const d = new Date(curr);
+        d.setDate(curr.getDate() + i);
+        week.push(d.toISOString().split('T')[0]);
       }
       return week;
     };
 
-    const getWeekStats = () => {
-      const weekDates = getWeekDates();
-      let cleared = 0;
-      weekDates.forEach(date => {
-        if (data[date] && isCleared(data[date])) {
-          cleared++;
-        }
-      });
-      return { cleared, total: 7 };
-    };
+    const weekDates = getWeekDates();
+    let clearedCount = 0;
 
-    const weekStats = getWeekStats();
+    // Calculate cleared days for this specific week from your existing data
+    weekDates.forEach(date => {
+      if (data[date] && isCleared(data[date])) {
+        clearedCount++;
+      }
+    });
+
+    // Get the rank based on the count
+    const rankData = calculateWeeklyRank(clearedCount);
 
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 p-4 md:p-8">
+      <div className="min-h-screen bg-gray-950 text-gray-100 p-4 md:p-8 font-mono">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="border-2 border-gray-700 p-6 bg-gray-900">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-cyan-400">WEEKLY RANK</h1>
-              <button
-                onClick={() => setView('daily')}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-sm"
-              >
+              <h1 className="text-2xl font-bold text-cyan-400">WEEKLY REPORT</h1>
+              <button onClick={() => setView('daily')} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-sm">
                 Back to Daily
               </button>
             </div>
-            <div className="space-y-3 text-sm">
-              <div>Week of: {getWeekDates()[0]}</div>
-              <div>Days Cleared: {weekStats.cleared} / 7</div>
-            </div>
+            <div className="text-sm text-gray-400">Week Starting: {weekDates[0]}</div>
           </div>
 
-          <div className="border-2 border-gray-700 p-6 bg-gray-900 space-y-4">
-            <label className="block text-sm font-semibold text-cyan-400">Rank this week:</label>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              {['E', 'D', 'C', 'B', 'A', 'S'].map(rank => (
-                <button
-                  key={rank}
-                  onClick={() => updateToday('weeklyRank.rank', rank)}
-                  className={`p-4 border-2 font-bold text-lg transition ${
-                    today.weeklyRank.rank === rank
-                      ? 'bg-cyan-500 border-cyan-400 text-gray-900'
-                      : 'bg-gray-800 border-gray-600 hover:border-gray-500'
-                  }`}
-                >
-                  {rank}
-                </button>
-              ))}
+          {/* Automatic Rank Card */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="border-2 border-gray-700 bg-gray-900 p-8 flex flex-col items-center justify-center text-center">
+              <div className="text-sm text-gray-500 uppercase tracking-widest mb-2">System Evaluation</div>
+              <div className={`text-9xl font-black ${rankData.color} drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]`}>
+                {rankData.rank}
+              </div>
+              <div className={`text-xl font-bold mt-4 ${rankData.color} tracking-widest`}>
+                {rankData.title}
+              </div>
+              <div className="mt-6 text-sm text-gray-400">
+                Cleared Days: <span className="text-white font-bold">{clearedCount}</span> / 7
+              </div>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs text-gray-400 bg-gray-800 p-4 border border-gray-700">
-              <div><strong className="text-cyan-400">S</strong> — Executed at max capacity, all systems go</div>
-              <div><strong className="text-green-400">A</strong> — Strong week, minor slips</div>
-              <div><strong className="text-blue-400">B</strong> — Solid, showed up consistently</div>
-              <div><strong className="text-yellow-400">C</strong> — Struggled but didn't quit</div>
-              <div><strong className="text-orange-400">D</strong> — Survival mode, barely held on</div>
-              <div><strong className="text-red-400">E</strong> — Didn't show up</div>
-            </div>
-          </div>
+            <div className="border-2 border-gray-700 bg-gray-900 p-6 flex flex-col justify-between">
+               <div>
+                  <h3 className="text-cyan-400 font-bold mb-4 border-b border-gray-700 pb-2">CRITERIA CHECKLIST</h3>
+                  <ul className="space-y-3 text-sm">
+                    {weekDates.map(date => {
+                      const isDayCleared = data[date] ? isCleared(data[date]) : false;
+                      const isFuture = new Date(date) > new Date(new Date().toISOString().split('T')[0]);
 
-          <div className="border-2 border-gray-700 p-6 bg-gray-900 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-cyan-400 mb-2">
-                One key insight from this week:
-              </label>
-              <textarea
-                value={today.weeklyRank.insight}
-                onChange={(e) => updateToday('weeklyRank.insight', e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 p-3 text-sm focus:border-cyan-500 focus:outline-none"
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-cyan-400 mb-2">
-                One calibration for next week:
-              </label>
-              <textarea
-                value={today.weeklyRank.calibration}
-                onChange={(e) => updateToday('weeklyRank.calibration', e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 p-3 text-sm focus:border-cyan-500 focus:outline-none"
-                rows={3}
-              />
-            </div>
-
-            <div className="text-center text-sm text-gray-400 italic mt-6 pt-4 border-t border-gray-700">
-              "Progress is non-linear. What matters is direction."
+                      return (
+                        <li key={date} className="flex justify-between items-center">
+                          <span className="text-gray-400">{date}</span>
+                          {isFuture ? (
+                            <span className="text-gray-600">PENDING</span>
+                          ) : (
+                            <span className={isDayCleared ? "text-green-400 font-bold" : "text-red-500"}>
+                              {isDayCleared ? "CLEARED" : "FAILED"}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+               </div>
             </div>
           </div>
         </div>
